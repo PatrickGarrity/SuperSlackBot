@@ -40,8 +40,11 @@ class Iris:
     @staticmethod
     def _is_command(event):
         """True if the event is a command, false otherwise. Commands are Slack messages that start with '!',
-        the command identifier."""
-        return event['type'] == 'message' and str(event['text']).startswith("!")
+        the command identifier, and contain all required fields."""
+        if 'type' in event and 'text' in event and 'user' in event and 'channel' in event:
+            return event['type'] == 'message' and str(event['text']).startswith("!")
+        else:
+            return False
 
     @staticmethod
     def _command_name(cmd):
@@ -76,8 +79,10 @@ class Iris:
 
     def handle_command(self, command):
         """Given some command, parse it and act upon it if the command is registered."""
-        handler = self.command_handlers[command.name]
-        if not handler:
-            print("No handler exists for command \'" + command.name + "\'.")
-        else:
+        if command.name in self.command_handlers:
+            handler = self.command_handlers[command.name]
             handler.handle_command(command)
+            return True
+        else:
+            print("No handler exists for command \'" + command.name + "\'.")
+            return False
