@@ -1,11 +1,14 @@
 from iris.iris import Iris
 from iris.handlers.iris_help import IrisHelpHandler
+from iris.analyzers.karma import KarmaAnalyzer
 
 handlers = {
     "help": IrisHelpHandler()
 }
 
-slack_token = "xoxb-44716617858-BVBafgRqyoLJm1GDnmEm5V6M"
+analyzers = [KarmaAnalyzer()]
 
-iris = Iris(slack_token, handlers)
+slack_token = ""
+
+iris = Iris(slack_token, handlers, analyzers)
 iris.run()

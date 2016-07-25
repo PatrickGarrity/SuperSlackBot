@@ -1,6 +1,7 @@
 import time
 
 from iris.iriscommand import IrisCommand
+from iris.message import SlackMessage
 from iris.signalhandler import ExitOnSignal
 from slackclient import SlackClient
 
@@ -8,9 +9,10 @@ from slackclient import SlackClient
 class Iris:
     """The Iris Slack bot engine."""
 
-    def __init__(self, slack_token, command_handlers):
+    def __init__(self, slack_token, command_handlers, message_analyzers):
         self.sc = SlackClient(slack_token)
         self.command_handlers = command_handlers
+        self.message_analyzers = message_analyzers
         self._signal_handler = ExitOnSignal()
 
     def run(self):
@@ -31,8 +33,9 @@ class Iris:
                 for command in commands:
                     self.handle_command(command)
 
-                # Sleep so that we're polite to Slack. There does not seem to be a blocking
-                # approach available at this time so this will have to do.
+                # Handle all message analyzers.
+                self.analyze_messages(events)
+
                 time.sleep(0.1)
         else:
             print("Failed to connect to Slack. Please verify you have a valid token.")
@@ -43,6 +46,14 @@ class Iris:
         the command identifier, and contain all required fields."""
         if 'type' in event and 'text' in event and 'user' in event and 'channel' in event:
             return event['type'] == 'message' and str(event['text']).startswith("!")
+        else:
+            return False
+
+    @staticmethod
+    def _is_message(event):
+        """True if the event is a message, false otherwise. Messages are slack messages of any form."""
+        if 'type' in event and 'text' in event and 'user' in event and 'channel' in event:
+            return event['type'] == 'message'
         else:
             return False
 
@@ -69,13 +80,26 @@ class Iris:
         """Builds an IrisCommand from the given Slack event."""
         return IrisCommand(self._command_name(cmd), cmd['user'], cmd['channel'], self._command_content(cmd))
 
+    @staticmethod
+    def _to_message(msg):
+        """Builds a SlackMessage from the given Slack event."""
+        return SlackMessage(msg['user'], msg['channel'], msg['text'])
+
     def filter_commands(self, events):
         """Given some list of events, filter such that only the commands remain."""
         return list(filter(lambda evt: self._is_command(evt), events))
 
+    def filter_messages(self, events):
+        """Given some list of events, filter such that only the messages remain."""
+        return list(filter(lambda evt: self._is_message(evt), events))
+
     def convert_commands(self, commands):
         """Given some list of commands, convert them into IrisCommand objects."""
         return list(map(lambda cmd: self._to_command(cmd), commands))
+
+    def convert_messages(self, messages):
+        """Given some list of messages, convert them into SlackMessage objects."""
+        return list(map(lambda msg: self._to_message(msg), messages))
 
     def handle_command(self, command):
         """Given some command, parse it and act upon it if the command is registered."""
@@ -88,3 +112,10 @@ class Iris:
             self.sc.rtm_send_message(command.channel,
                                      "No such command \'" + command.name + "\' exists, please type !help for a list.")
             return False
+
+    def analyze_messages(self, events):
+        """Given a list of events, analyze all that represent messages posted to some channel.
+        This is structured so that every analyzer for a message is processed before handling the next message."""
+        for message in self.convert_messages(self.filter_messages(events)):
+            for analyzer in self.message_analyzers:
+                analyzer.analyze_message(self.sc, message)
