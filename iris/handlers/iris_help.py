@@ -1,4 +1,4 @@
-from iris import IrisHandler
+from iris.irishandler import IrisHandler
 
 
 class IrisHelpHandler(IrisHandler):

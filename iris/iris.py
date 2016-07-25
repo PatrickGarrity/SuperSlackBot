@@ -33,7 +33,7 @@ class Iris:
 
                 # Sleep so that we're polite to Slack. There does not seem to be a blocking
                 # approach available at this time so this will have to do.
-                time.sleep(1)
+                time.sleep(0.1)
         else:
             print("Failed to connect to Slack. Please verify you have a valid token.")
 
@@ -81,8 +81,10 @@ class Iris:
         """Given some command, parse it and act upon it if the command is registered."""
         if command.name in self.command_handlers:
             handler = self.command_handlers[command.name]
-            handler.handle_command(command)
+            handler.handle_command(self.sc, command)
             return True
         else:
             print("No handler exists for command \'" + command.name + "\'.")
+            self.sc.rtm_send_message(command.channel,
+                                     "No such command \'" + command.name + "\' exists, please type !help for a list.")
             return False
